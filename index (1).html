@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>সুদের হিসাব খাতা</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;--bg:#f7f5ee;--card:#fffefa;--ink:#17301f;--mute:#5f6e63;--line:#dcd8c8;--acc:#1b4d2e;--accink:#fff;--due:#a8321f;--ok:#1b4d2e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans Bengali",system-ui,sans-serif;line-height:1.6}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:8px 0 14px;color:var(--acc)}
+h2{font-size:1.05rem;margin:0 0 10px}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.sum small{display:block;color:var(--mute);font-size:.8rem}
+.sum div:first-child{background:var(--acc);border-color:var(--acc);color:#fff}
+.sum div:first-child small{color:#cfe3d5}
+.sum b{font-size:1.15rem}
+.sum .due b{color:var(--due)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+label{display:block;font-size:.85rem;color:var(--mute);margin:8px 0 2px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;border:0;border-radius:8px;padding:10px 14px;background:var(--acc);color:var(--accink);font-weight:600;cursor:pointer}
+button.alt{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:400}
+button.del{background:transparent;color:var(--due);padding:6px 8px;font-weight:400}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.loan{border-top:1px solid var(--line);padding:12px 0}
+.loan:first-of-type{border-top:0}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.name{font-weight:700}
+.meta{color:var(--mute);font-size:.85rem}
+.due-amt{color:var(--due);font-weight:700}
+.clear{color:var(--ok);font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:.92rem;margin:6px 0}
+.hist{font-size:.82rem;color:var(--mute);margin:6px 0;max-height:170px;overflow-y:auto}
+.hist div{display:flex;justify-content:space-between;align-items:center}
+#msg{display:none;position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--acc);color:#fff;padding:12px 14px;border-radius:10px;text-align:center;z-index:5}
+.act{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.pay{display:none;margin-top:8px;padding:10px;background:var(--bg);border-radius:8px}
+.pay.open{display:block}
+.empty{color:var(--mute);padding:8px 0}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.note{font-size:.8rem;color:var(--mute);margin-top:10px}
+</style>
+</head>
+<body>
+<main>
+<h1>সুদের হিসাব খাতা</h1>
+
+<div class="sum" id="sum"></div>
+
+<div class="panel">
+<h2>নতুন ঋণ যোগ করুন</h2>
+<form id="addForm" onsubmit="return false">
+<label for="n">গ্রাহকের নাম</label><input id="n" autocomplete="off">
+<div class="row">
+<div><label for="p">ঋণের পরিমাণ (টাকা)</label><input id="p" type="number" inputmode="decimal" min="1"></div>
+<div><label for="r">মাসিক সুদ (%)</label><input id="r" type="number" inputmode="decimal" value="10" step="0.1"></div>
+</div>
+<div class="row">
+<div><label for="d">ঋণ দেওয়ার তারিখ</label><input id="d" type="date"></div>
+<div><label for="ph">ফোন (ঐচ্ছিক)</label><input id="ph" type="tel" inputmode="tel"></div>
+</div>
+<div style="margin-top:12px"><button id="addBtn">ঋণ সংরক্ষণ করুন</button></div>
+</form>
+</div>
+
+<div class="panel">
+<h2>ঋণের তালিকা</h2>
+<div class="row" style="margin-bottom:6px"><input id="q" placeholder="নাম দিয়ে খুঁজুন"><select id="f"><option value="all">সবাই</option><option value="prin">আসল বাকি আছে</option><option value="due">সুদ বাকি আছে</option><option value="done">সম্পূর্ণ পরিশোধ</option></select></div>
+<div id="list"></div>
+</div>
+
+<div class="panel">
+<h2>ব্যাকআপ</h2>
+<div class="tools">
+<button class="alt" id="copyBtn">তথ্য কপি করুন</button>
+<button class="alt" id="restoreBtn">কপি করা তথ্য ফিরিয়ে আনুন</button>
+</div>
+<textarea id="box" rows="3" style="display:none;width:100%;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)" placeholder="এখানে আগে কপি করা তথ্য পেস্ট করুন, তারপর আবার ‘ফিরিয়ে আনুন’ চাপুন"></textarea>
+<p class="note">তথ্য শুধু এই ফোন/ব্রাউজারে জমা থাকে। ব্রাউজারের ডাটা মুছলে হারিয়ে যাবে, তাই নিয়মিত “তথ্য কপি করুন” চেপে নিজের নোটে বা মেসেজে রেখে দিন।</p>
+</div>
+</main>
+<div id="msg" role="status"></div>
+
+<script>
+var KEY="hishab-khata-v1", loans=[];
+function load(){try{var s=localStorage.getItem(KEY);loans=s?JSON.parse(s):[]}catch(e){loans=[]}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(loans))}catch(e){}}
+function bn(n){return Math.round(n).toLocaleString("bn-BD")}
+function today(){var t=new Date();return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0")}
+function bd(s){var a=s.split("-");return new Date(+a[0],+a[1]-1,+a[2]).toLocaleDateString("bn-BD",{day:"numeric",month:"short",year:"numeric"})}
+function days(a,b){return Math.round((new Date(b)-new Date(a))/864e5)}
+// সুদ = বকেয়া আসলের উপর মাসিক হার; প্রতি ৩০ দিনে এক মাস ধরা হয়েছে
+function calc(l){
+  var ev=l.pay.slice().sort(function(x,y){return x.date<y.date?-1:x.date>y.date?1:0});
+  var prin=l.principal,last=l.date,accr=0,paidInt=0,paidPrin=0;
+  ev.forEach(function(e){
+    accr+=prin*(l.rate/100)*(Math.max(0,days(last,e.date))/30);last=e.date;
+    if(e.type==="interest")paidInt+=e.amt;else{paidPrin+=e.amt;prin=Math.max(0,prin-e.amt)}
+  });
+  accr+=prin*(l.rate/100)*(Math.max(0,days(last,today()))/30);
+  return{prin:prin,accr:accr,paidInt:paidInt,paidPrin:paidPrin,due:Math.max(0,accr-paidInt),monthly:prin*l.rate/100};
+}
+function render(){
+  var tl=0,to=0,td=0,tc=0,na=0,nd=0,q=document.getElementById("q").value.trim().toLowerCase(),fl=document.getElementById("f").value,h="";
+  loans.forEach(function(l){var c=calc(l);tl+=l.principal;to+=c.prin;td+=c.due;tc+=c.paidInt;if(c.prin>0.5)na++;if(c.due>0.5)nd++});
+  document.getElementById("sum").innerHTML=
+   '<div style="grid-column:1/-1"><small>সব মিলিয়ে মোট পাওনা (আসল + সুদ)</small><b style="font-size:1.5rem">৳'+bn(to+td)+'</b></div>'+
+   '<div><small>আসল বাকি আছে</small><b>'+na.toLocaleString("bn-BD")+' জনের কাছে</b></div>'+
+   '<div class="due"><small>সুদ বাকি আছে</small><b>'+nd.toLocaleString("bn-BD")+' জনের কাছে</b></div>'+
+   '<div><small>মোট দেওয়া ঋণ</small><b>৳'+bn(tl)+'</b></div>'+
+   '<div><small>বর্তমান বকেয়া আসল</small><b>৳'+bn(to)+'</b></div>'+
+   '<div class="due"><small>মোট সুদ পাওনা</small><b>৳'+bn(td)+'</b></div>'+
+   '<div><small>এ পর্যন্ত সুদ আদায়</small><b>৳'+bn(tc)+'</b></div>';
+  var shown=loans.filter(function(l){
+    if(q&&l.name.toLowerCase().indexOf(q)<0)return false;
+    var c=calc(l);
+    if(fl==="prin")return c.prin>0.5;
+    if(fl==="due")return c.due>0.5;
+    if(fl==="done")return c.prin<=0.5&&c.due<=0.5;
+    return true;
+  }).sort(function(a,b){return calc(b).due-calc(a).due});
+  if(!shown.length)h='<div class="empty">'+(loans.length?"কোনো মিল পাওয়া যায়নি।":"এখনো কোনো ঋণ নেই। উপরের ফর্মে প্রথম ঋণটি যোগ করুন।")+'</div>';
+  shown.forEach(function(l){
+    var c=calc(l),i=loans.indexOf(l);
+    var hist=l.pay.map(function(e,k){return{e:e,k:k}}).sort(function(a,b){return a.e.date<b.e.date?1:-1}).map(function(o){
+      return '<div><span>'+bd(o.e.date)+' · '+(o.e.type==="interest"?"সুদ":"আসল")+' ৳'+bn(o.e.amt)+'</span><button class="del" data-dp="'+i+':'+o.k+'">মুছুন</button></div>'}).join("");
+    h+='<div class="loan"><div class="top"><span class="name">'+esc(l.name)+'</span>'+
+     (c.due>0.5?'<span class="due-amt">সুদ পাওনা ৳'+bn(c.due)+'</span>':'<span class="clear">সুদ পরিশোধিত</span>')+'</div>'+
+     '<div class="meta">'+bd(l.date)+' থেকে · মাসিক '+l.rate.toLocaleString("bn-BD")+'%'+(l.phone?' · '+esc(l.phone):'')+'</div>'+
+     '<div class="grid"><span>মূল ঋণ: ৳'+bn(l.principal)+'</span><span>বকেয়া আসল: ৳'+bn(c.prin)+'</span>'+
+     '<span>মাসিক সুদ এখন: ৳'+bn(c.monthly)+'</span><span>সুদ আদায়: ৳'+bn(c.paidInt)+'</span></div>'+
+     (hist?'<div class="hist">'+hist+'</div>':'')+
+     '<div class="act"><button data-pay="'+i+'">টাকা জমা নিন</button><button class="del" data-del="'+i+'">মুছুন</button></div>'+
+     '<div class="pay" id="pay'+i+'"><div class="row"><div><label>ধরন</label><select id="pt'+i+'"><option value="interest">সুদ</option><option value="principal">আসল</option></select></div>'+
+     '<div><label>পরিমাণ (টাকা)</label><input id="pa'+i+'" type="number" inputmode="decimal" value="'+Math.round(c.due)+'"></div></div>'+
+     '<label>তারিখ</label><input id="pd'+i+'" type="date" value="'+today()+'">'+
+     '<div style="margin-top:10px"><button data-save="'+i+'">জমা সংরক্ষণ করুন</button></div></div></div>';
+  });
+  document.getElementById("list").innerHTML=h;
+}
+function toast(t){var m=document.getElementById("msg");m.textContent=t;m.style.display="block";clearTimeout(window.__t);window.__t=setTimeout(function(){m.style.display="none"},3500)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+document.getElementById("d").value=today();
+document.getElementById("q").addEventListener("input",render);
+document.getElementById("f").addEventListener("change",render);
+document.getElementById("addBtn").addEventListener("click",function(){
+  var n=document.getElementById("n").value.trim(),p=parseFloat(document.getElementById("p").value),
+      r=parseFloat(document.getElementById("r").value),d=document.getElementById("d").value;
+  if(!n||!(p>0)||!(r>=0)||!d){toast("নাম, ঋণের পরিমাণ, সুদের হার ও তারিখ দিন।");return}
+  loans.unshift({name:n,principal:p,rate:r,date:d,phone:document.getElementById("ph").value.trim(),pay:[]});
+  save();["n","p","ph"].forEach(function(x){document.getElementById(x).value=""});render();
+});
+document.getElementById("list").addEventListener("click",function(e){
+  var t=e.target;
+  if(t.dataset.pay!==undefined)document.getElementById("pay"+t.dataset.pay).classList.toggle("open");
+  if(t.dataset.save!==undefined){
+    var i=t.dataset.save,a=parseFloat(document.getElementById("pa"+i).value);
+    if(!(a>0)){toast("সঠিক পরিমাণ দিন।");return}
+    loans[i].pay.push({type:document.getElementById("pt"+i).value,amt:a,date:document.getElementById("pd"+i).value||today()});
+    save();render();
+  }
+  if(t.dataset.del!==undefined){
+    if(t.dataset.arm==="1"){loans.splice(t.dataset.del,1);save();render()}
+    else{t.dataset.arm="1";t.textContent="নিশ্চিত? আবার চাপুন"}
+  }
+  if(t.dataset.dp!==undefined){
+    if(t.dataset.arm==="1"){var a2=t.dataset.dp.split(":");loans[+a2[0]].pay.splice(+a2[1],1);save();render()}
+    else{t.dataset.arm="1";t.textContent="নিশ্চিত?"}
+  }
+});
+var box=document.getElementById("box");
+document.getElementById("copyBtn").addEventListener("click",function(){
+  var s=JSON.stringify(loans);box.style.display="block";box.value=s;box.select();
+  try{navigator.clipboard.writeText(s)}catch(e){}
+});
+document.getElementById("restoreBtn").addEventListener("click",function(){
+  if(box.style.display==="none"){box.style.display="block";box.value="";box.focus();return}
+  try{var a=JSON.parse(box.value);if(!Array.isArray(a))throw 0;
+    loans=a;save();render();box.style.display="none";toast("তথ্য ফিরিয়ে আনা হয়েছে।")}
+  catch(e){toast("তথ্যটি সঠিক নয়। আবার পেস্ট করুন।")}
+});
+load();render();
+</script>
+</body>
+</html>
